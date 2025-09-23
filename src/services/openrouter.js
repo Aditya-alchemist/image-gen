@@ -1,4 +1,5 @@
 export async function generateImage(prompt) {
+
   const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -31,6 +32,7 @@ export async function generateImage(prompt) {
   // Since OpenRouter doesn't have many free image generation models
   return await generatePlaceholderImage(prompt);
 }
+const REACT_APP_PINATA_JWT="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySW5mb3JtYXRpb24iOnsiaWQiOiJmNWZlZjZkYS04YjA5LTQ1NWYtYjg2MS0wYjI3ODM2ZmI0Y2EiLCJlbWFpbCI6ImFkaXR5YWt1bWFyNDEyMDVAZ21haWwuY29tIiwiZW1haWxfdmVyaWZpZWQiOnRydWUsInBpbl9wb2xpY3kiOnsicmVnaW9ucyI6W3siZGVzaXJlZFJlcGxpY2F0aW9uQ291bnQiOjEsImlkIjoiRlJBMSJ9LHsiZGVzaXJlZFJlcGxpY2F0aW9uQ291bnQiOjEsImlkIjoiTllDMSJ9XSwidmVyc2lvbiI6MX0sIm1mYV9lbmFibGVkIjpmYWxzZSwic3RhdHVzIjoiQUNUSVZFIn0sImF1dGhlbnRpY2F0aW9uVHlwZSI6InNjb3BlZEtleSIsInNjb3BlZEtleUtleSI6IjE4MjhkZTg4ZDYyMWMxMWM3ZmY3Iiwic2NvcGVkS2V5U2VjcmV0IjoiZjcyNWRhZDMxMzRhYjJkZTVkYTU1NDMyMWQ1NDMxNGNkNDVjNGJkNTY2OTNiNjlhMjlmZmI5NDFmZjA4ZmNiNSIsImV4cCI6MTc5MDA1Njk0OH0.-XwNFcWrXFRZqodCVtPo15E5I9O4yjybTwhNtaOCEQo"
 
 // Fallback: Generate using a free image API
 export async function generatePlaceholderImage(prompt) {
@@ -116,7 +118,7 @@ export async function uploadToIPFS(imageBuffer, filename = "generated.png") {
 
   const response = await fetch("https://api.pinata.cloud/pinning/pinFileToIPFS", {
     method: "POST",
-    headers: { "Authorization": `Bearer ${process.env.REACT_APP_PINATA_JWT}` },
+    headers: { "Authorization": `Bearer ${REACT_APP_PINATA_JWT}` },
     body: formData
   });
 
