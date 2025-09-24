@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react';
 import { BrowserProvider, Contract } from 'ethers';
-import { generateImageWithPollinations, uploadToIPFS, uploadMetadata, base64ToBytes } from './services/openrouter';
+import { generateImageWithPollinations, uploadToIPFS, uploadMetadata } from './services/openrouter';
 import './App.css';
 
-const REACT_APP_PINATA_JWT="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySW5mb3JtYXRpb24iOnsiaWQiOiJmNWZlZjZkYS04YjA5LTQ1NWYtYjg2MS0wYjI3ODM2ZmI0Y2EiLCJlbWFpbCI6ImFkaXR5YWt1bWFyNDEyMDVAZ21haWwuY29tIiwiZW1haWxfdmVyaWZpZWQiOnRydWUsInBpbl9wb2xpY3kiOnsicmVnaW9ucyI6W3siZGVzaXJlZFJlcGxpY2F0aW9uQ291bnQiOjEsImlkIjoiRlJBMSJ9LHsiZGVzaXJlZFJlcGxpY2F0aW9uQ291bnQiOjEsImlkIjoiTllDMSJ9XSwidmVyc2lvbiI6MX0sIm1mYV9lbmFibGVkIjpmYWxzZSwic3RhdHVzIjoiQUNUSVZFIn0sImF1dGhlbnRpY2F0aW9uVHlwZSI6InNjb3BlZEtleSIsInNjb3BlZEtleUtleSI6IjE4MjhkZTg4ZDYyMWMxMWM3ZmY3Iiwic2NvcGVkS2V5U2VjcmV0IjoiZjcyNWRhZDMxMzRhYjJkZTVkYTU1NDMyMWQ1NDMxNGNkNDVjNGJkNTY2OTNiNjlhMjlmZmI5NDFmZjA4ZmNiNSIsImV4cCI6MTc5MDA1Njk0OH0.-XwNFcWrXFRZqodCVtPo15E5I9O4yjybTwhNtaOCEQo"
-const REACT_APP_CONTRACT_ADDRESS="0x2a789dd2c7b84bd55dbde9b635b16ce493dafeb2"
+const REACT_APP_CONTRACT_ADDRESS = "0x2a789dd2c7b84bd55dbde9b635b16ce493dafeb2";
 
 const CONTRACT_ABI = [
   {
@@ -28,18 +27,49 @@ function App() {
   const [walletAddress, setWalletAddress] = useState(null);
   const [notifications, setNotifications] = useState([]);
 
+  // FIXED: Enhanced notification system
   const addNotification = (message, type = 'info') => {
-    const id = Date.now();
-    const notification = { id, message, type };
-    setNotifications(prev => [...prev, notification]);
+    const id = Date.now() + Math.random();
+    const notification = { 
+      id, 
+      message, 
+      type, 
+      timestamp: Date.now(),
+      removing: false 
+    };
     
+    setNotifications(prev => {
+      // Remove any existing notification with the same message to prevent duplicates
+      const filtered = prev.filter(n => n.message !== message);
+      // Add new notification to the end (will appear at top)
+      return [...filtered, notification];
+    });
+    
+    // Auto-remove after 5 seconds
     setTimeout(() => {
-      setNotifications(prev => prev.filter(n => n.id !== id));
+      removeNotification(id);
     }, 5000);
   };
 
   const removeNotification = (id) => {
-    setNotifications(prev => prev.filter(n => n.id !== id));
+    // First mark as removing for exit animation
+    setNotifications(prev => 
+      prev.map(n => n.id === id ? { ...n, removing: true } : n)
+    );
+    
+    // Then actually remove after animation
+    setTimeout(() => {
+      setNotifications(prev => prev.filter(n => n.id !== id));
+    }, 300);
+  };
+
+  const clearAllNotifications = () => {
+    // Mark all as removing first
+    setNotifications(prev => prev.map(n => ({ ...n, removing: true })));
+    // Then clear all after animation
+    setTimeout(() => {
+      setNotifications([]);
+    }, 300);
   };
 
   useEffect(() => {
@@ -62,9 +92,21 @@ function App() {
       await provider.send("eth_requestAccounts", []);
       
       const network = await provider.getNetwork();
-      if (network.chainId !== 11155111) {
+      if (network.chainId !== 11155111n) {
         addNotification("Switching to Sepolia network...", 'info');
-        await provider.send("wallet_switchEthereumChain", [{ chainId: "0xaa36a7" }]);
+        try {
+          await provider.send("wallet_switchEthereumChain", [{ chainId: "0xaa36a7" }]);
+        } catch (switchError) {
+          if (switchError.code === 4902) {
+            await provider.send("wallet_addEthereumChain", [{
+              chainId: "0xaa36a7",
+              chainName: "Sepolia Test Network",
+              nativeCurrency: { name: "SepoliaETH", symbol: "SEP", decimals: 18 },
+              rpcUrls: ["https://sepolia.infura.io/v3/"],
+              blockExplorerUrls: ["https://sepolia.etherscan.io/"]
+            }]);
+          }
+        }
       }
       
       const signer = await provider.getSigner();
@@ -100,7 +142,7 @@ function App() {
     setTxHash(null);
 
     try {
-      let result = await generateImageWithPollinations(prompt);
+      const result = await generateImageWithPollinations(prompt);
       const { display_url, blob } = result;
       
       if (display_url) {
@@ -163,18 +205,51 @@ function App() {
 
   return (
     <div className="App">
-      {/* Notification Container */}
+      {/* FIXED: Notification Container with proper stacking */}
       <div className="notification-container">
-        {notifications.map(notification => (
+        {notifications.map((notification, index) => (
           <div 
-            key={notification.id} 
-            className={`notification notification-${notification.type}`}
-            onClick={() => removeNotification(notification.id)}
+            key={notification.id}
+            className={`notification notification-${notification.type} ${
+              notification.removing ? 'notification-removing' : 'notification-entering'
+            }`}
+            style={{ 
+              '--delay': `${index * 0.1}s`,
+              '--index': index
+            }}
           >
-            <span>{notification.message}</span>
-            <button className="notification-close">×</button>
+            <div className="notification-content">
+              <div className="notification-icon">
+                {notification.type === 'success' && '✅'}
+                {notification.type === 'error' && '❌'}
+                {notification.type === 'info' && 'ℹ️'}
+              </div>
+              <span className="notification-message">{notification.message}</span>
+            </div>
+            <button 
+              className="notification-close"
+              onClick={(e) => {
+                e.stopPropagation();
+                removeNotification(notification.id);
+              }}
+              type="button"
+            >
+              ×
+            </button>
+            <div className="notification-progress"></div>
           </div>
         ))}
+        
+        {/* Clear all button when multiple notifications */}
+        {notifications.length > 3 && (
+          <button 
+            className="clear-all-btn"
+            onClick={clearAllNotifications}
+            type="button"
+          >
+            Clear All ({notifications.length})
+          </button>
+        )}
       </div>
 
       <header className="App-header">
@@ -283,7 +358,7 @@ function App() {
             <li>Review the generated image in the preview panel</li>
             <li>Click "Mint NFT" to create your NFT on the blockchain</li>
           </ol>
-          <p><strong>Contract Address:</strong> {process.env.REACT_APP_CONTRACT_ADDRESS}</p>
+          <p><strong>Contract Address:</strong> {REACT_APP_CONTRACT_ADDRESS}</p>
         </div>
       </div>
     </div>
